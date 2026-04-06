@@ -5,6 +5,7 @@
       "id": "Unique string key. Use kebab-case (e.g. 'iron-ore'). Must match exactly when referenced in recipes.",
       "name": "Display name shown in the UI (e.g. 'Iron Ore').",
       "craftable": "true = this item can be crafted (has a recipe). false = raw material, no recipe.",
+      "droppable": "Optional. true = players typically obtain this by farming/buying rather than crafting. When true, the 'craft' checkbox defaults to unchecked. Omit or false for normal craftable items.",
       "recipe": "Array of ingredients needed to craft ONE unit of this item. Only include if craftable=true. Omit or set to [] if craftable=false.",
       "recipe[].itemId": "The 'id' of the ingredient item. Must exist in this file.",
       "recipe[].qty": "How many units of this ingredient are needed per craft of the parent item."
@@ -102,6 +103,7 @@
       "id": "1002012",
       "name": "Chaotic Rune",
       "craftable": true,
+      "droppable": true,
       "recipe": [
         {
           "itemId": "1002011",
@@ -121,6 +123,7 @@
       "id": "1001998",
       "name": "Frontier Magic Stone",
       "craftable": true,
+      "droppable": true,
       "recipe": [
         {
           "itemId": "1001997",
@@ -140,6 +143,7 @@
       "id": "1001997",
       "name": "Frontier Magic Powder",
       "craftable": true,
+      "droppable": true,
       "recipe": [
         {
           "itemId": "1000322",
@@ -186,12 +190,14 @@
     {
       "id": "1001972",
       "name": "Root Gold Coin",
-      "craftable": false
+      "craftable": false,
+      "droppable": true
     },
     {
       "id": "1002003",
       "name": "Azure Illusion Stone",
       "craftable": true,
+      "droppable": true,
       "recipe": [
         {
           "itemId": "1001999",
@@ -226,6 +232,7 @@
       "id": "1002004",
       "name": "Sunset Illusion Stone",
       "craftable": true,
+      "droppable": true,
       "recipe": [
         {
           "itemId": "1002000",

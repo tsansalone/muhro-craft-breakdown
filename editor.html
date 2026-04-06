@@ -461,16 +461,28 @@ function renderEditor(item, isNew) {
       </div>
     </div>
 
-    <div class="field-group">
-      <label class="field-label">Type</label>
-      <div class="toggle-row">
-        <label class="toggle-switch">
-          <input type="checkbox" id="f-craftable" ${item.craftable ? 'checked' : ''}>
-          <span class="toggle-slider"></span>
-        </label>
-        <span class="toggle-label" id="craftable-label">
-          ${item.craftable ? 'Craftable (has a recipe)' : 'Raw material (no recipe)'}
-        </span>
+    <div class="field-row">
+      <div class="field-group">
+        <label class="field-label">Type</label>
+        <div class="toggle-row">
+          <label class="toggle-switch">
+            <input type="checkbox" id="f-craftable" ${item.craftable ? 'checked' : ''}>
+            <span class="toggle-slider"></span>
+          </label>
+          <span class="toggle-label" id="craftable-label">
+            ${item.craftable ? 'Craftable (has a recipe)' : 'Raw material (no recipe)'}
+          </span>
+        </div>
+      </div>
+      <div class="field-group">
+        <label class="field-label">Droppable <span class="field-hint">(craft checkbox defaults to off)</span></label>
+        <div class="toggle-row">
+          <label class="toggle-switch">
+            <input type="checkbox" id="f-droppable" ${item.droppable ? 'checked' : ''}>
+            <span class="toggle-slider"></span>
+          </label>
+          <span class="toggle-label">${item.droppable ? 'Obtainable via drop / buy' : 'Not flagged as droppable'}</span>
+        </div>
       </div>
     </div>
 
@@ -503,6 +515,12 @@ function renderEditor(item, isNew) {
     document.getElementById('recipe-section').style.display = e.target.checked ? '' : 'none';
     document.getElementById('craftable-label').textContent =
       e.target.checked ? 'Craftable (has a recipe)' : 'Raw material (no recipe)';
+  });
+
+  // Droppable toggle label
+  document.getElementById('f-droppable').addEventListener('change', e => {
+    e.target.closest('.toggle-row').querySelector('.toggle-label').textContent =
+      e.target.checked ? 'Obtainable via drop / buy' : 'Not flagged as droppable';
   });
 
   document.getElementById('add-ing-btn').addEventListener('click', () => addIngRow('', 1));
@@ -554,8 +572,9 @@ function showNotice(msg, type) {
 function commitItem(isNew) {
   const id       = document.getElementById('f-id').value.trim();
   const name     = document.getElementById('f-name').value.trim();
-  const craftable = document.getElementById('f-craftable').checked;
-  const recipe   = craftable ? collectRecipe() : [];
+  const craftable  = document.getElementById('f-craftable').checked;
+  const droppable  = document.getElementById('f-droppable').checked;
+  const recipe     = craftable ? collectRecipe() : [];
 
   const errors = [];
   if (!id)   errors.push('ID is required.');
@@ -567,6 +586,7 @@ function commitItem(isNew) {
 
   const built = { id, name };
   built.craftable = craftable;
+  if (droppable) built.droppable = true;
   if (craftable && recipe.length) built.recipe = recipe;
 
   if (isNew) {

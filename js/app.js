@@ -26,9 +26,10 @@
 // ── State ──────────────────────────────────────────────────────────────────
 let itemsMap = new Map();          // id → item object
 let selectedItem = null;           // currently displayed item
-const breakdownState = new Map();  // rowKey → boolean (expanded?)
-const haveState = new Map();       // rowKey → number  (qty player already has)
-const skipState = new Set();       // rowKey → marked as "obtain directly, don't break down"
+const breakdownState  = new Map();  // rowKey → boolean (expanded?)
+const haveState       = new Map();  // rowKey → number  (qty player already has)
+const craftDecisions  = new Map();  // rowKey → explicit user choice: true=craft, false=skip/drop
+                                    // when unset, default is: craft unless item.droppable
 
 // ── Bootstrap ──────────────────────────────────────────────────────────────
 async function init() {
@@ -107,7 +108,7 @@ function selectItem(item, listEl) {
   selectedItem = item;
   breakdownState.clear();
   haveState.clear();
-  skipState.clear();
+  craftDecisions.clear();
   closeResults(listEl);
   document.getElementById('search-input').value = item.name;
   renderRecipePanel(item);
@@ -286,7 +287,7 @@ function renderIngredientTree(ingredients, fullMultiplier, effectiveMultiplier, 
     const unknownBadge = !item ? '<span class="unknown-badge">?</span>' : '';
     const connector    = depth === 0 ? '◆' : '└─';
 
-    const skipped  = skipState.has(rowKey);
+    const skipped  = !willCraft(rowKey, item);
     const deducted = fullQty !== effectiveQty;
     const qtyHtml  = twoCol
       ? `<div class="qty-group">
@@ -332,12 +333,8 @@ function renderIngredientTree(ingredients, fullMultiplier, effectiveMultiplier, 
     // Craft checkbox
     if (isCraftable) {
       rowEl.querySelector('.craft-check').addEventListener('change', (e) => {
-        if (e.target.checked) {
-          skipState.delete(rowKey);
-        } else {
-          skipState.add(rowKey);
-          breakdownState.delete(rowKey); // collapse if was expanded
-        }
+        craftDecisions.set(rowKey, e.target.checked);
+        if (!e.target.checked) breakdownState.delete(rowKey); // collapse if was expanded
         renderRecipePanel(selectedItem);
       });
     }
@@ -408,7 +405,7 @@ function hasAnyDeductions(ingredients, multiplier, parentKey) {
     const rowKey = `${parentKey}|${ingredient.itemId}|${index}`;
     if ((haveState.get(rowKey) || 0) > 0) return true;
     const item = itemsMap.get(ingredient.itemId);
-    if (isBreakdownable(item) && breakdownState.get(rowKey) === true && !skipState.has(rowKey)) {
+    if (isBreakdownable(item) && breakdownState.get(rowKey) === true && willCraft(rowKey, item)) {
       const qty = ingredient.qty * multiplier;
       return hasAnyDeductions(item.recipe, qty, rowKey);
     }
@@ -434,7 +431,7 @@ function buildFullTree(ingredients, multiplier, depth, parentKey) {
 
     const name        = item ? item.name : ingredient.itemId + ' (?)';
     const isCraftable = isBreakdownable(item);
-    const recurse     = isCraftable && expanded && !skipState.has(rowKey);
+    const recurse     = isCraftable && expanded && willCraft(rowKey, item);
     const craftedNote = recurse ? ' [crafted]' : '';
     const haveNote    = have > 0 ? ` (have ${have})` : '';
 
@@ -469,7 +466,7 @@ function buildNeededTree(ingredients, multiplier, depth, parentKey) {
 
     const name        = item ? item.name : ingredient.itemId + ' (?)';
     const isCraftable = isBreakdownable(item);
-    const recurse     = isCraftable && expanded && !skipState.has(rowKey);
+    const recurse     = isCraftable && expanded && willCraft(rowKey, item);
     const craftedNote = recurse ? ' [crafted]' : '';
 
     lines.push(`${indent}${formatQtyText(effectiveQty)} ${name}${craftedNote}`);
@@ -500,7 +497,7 @@ function buildAggregate(ingredients, fullMultiplier, effectiveMultiplier, parent
       const have         = haveState.get(rowKey) || 0;
       const effectiveQty = Math.max(0, baseEffQty - have);
 
-      if (isBreakdownable(item) && !skipState.has(rowKey)) {
+      if (isBreakdownable(item) && willCraft(rowKey, item)) {
         recurse(item.recipe, fullQty, effectiveQty, rowKey);
       } else {
         const name     = item ? item.name : ingredient.itemId + ' (?)';
@@ -586,6 +583,16 @@ function isBreakdownable(item) {
 }
 function formatQty(n) {
   return formatNum(n);
+}
+
+/**
+ * Returns true if the player intends to craft this ingredient row.
+ * Default: craft (true), unless the item is flagged droppable — then skip (false).
+ * The player can always override either direction via the craft checkbox.
+ */
+function willCraft(rowKey, item) {
+  if (craftDecisions.has(rowKey)) return craftDecisions.get(rowKey);
+  return !(item && item.droppable);
 }
 
 function muhroUrl(itemId) {
