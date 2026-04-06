@@ -1,0 +1,12 @@
+# BMad tooling & planning artifacts
+_bmad/
+_bmad-output/
+.claude/
+.agents/
+.cursor/
+design-artifacts/
+docs/
+
+# OS
+.DS_Store
+Thumbs.db

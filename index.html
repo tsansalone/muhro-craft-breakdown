@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Craft Breakdown — MuhRO</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <header>
+    <h1>⚔ Craft Breakdown</h1>
+    <p>MuhRO private server — crafting material calculator</p>
+  </header>
+
+  <main>
+
+    <!-- Search -->
+    <div class="search-wrapper">
+      <label for="search-input">Search item</label>
+      <input
+        id="search-input"
+        type="text"
+        placeholder="e.g. Iron Sword, Leather Grip…"
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <ul id="search-results" role="listbox" aria-label="Search results"></ul>
+    </div>
+
+    <!-- Recipe panel (hidden until item selected) -->
+    <div id="recipe-panel" role="region" aria-label="Recipe breakdown"></div>
+
+  </main>
+
+  <script src="js/app.js"></script>
+</body>
+</html>

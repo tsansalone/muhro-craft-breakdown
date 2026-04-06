@@ -1,0 +1,134 @@
+{
+  "_schema": {
+    "_comment": "HOW TO ADD ITEMS — read this before editing",
+    "_fields": {
+      "id": "Unique string key. Use kebab-case (e.g. 'iron-ore'). Must match exactly when referenced in recipes.",
+      "name": "Display name shown in the UI (e.g. 'Iron Ore').",
+      "category": "Optional grouping label shown in search (e.g. 'Metal', 'Weapon', 'Potion'). Use empty string '' to omit.",
+      "craftable": "true = this item can be crafted (has a recipe). false = raw material, no recipe.",
+      "recipe": "Array of ingredients needed to craft ONE unit of this item. Only include if craftable=true. Omit or set to [] if craftable=false.",
+      "recipe[].itemId": "The 'id' of the ingredient item. Must exist in this file.",
+      "recipe[].qty": "How many units of this ingredient are needed per craft of the parent item."
+    },
+    "_minimal_example": {
+      "id": "my-new-item",
+      "name": "My New Item",
+      "category": "Misc",
+      "craftable": true,
+      "recipe": [
+        { "itemId": "iron-ore", "qty": 3 },
+        { "itemId": "coal", "qty": 1 }
+      ]
+    },
+    "_tips": [
+      "To add a raw material: set craftable=false and omit recipe.",
+      "To add a craftable item: set craftable=true and fill recipe[].",
+      "IDs are case-sensitive. 'Iron-Ore' and 'iron-ore' are different.",
+      "You can nest arbitrarily deep — the app handles multi-level breakdown automatically.",
+      "Avoid circular references (A needs B needs A). The app does not guard against infinite loops."
+    ]
+  },
+
+  "items": [
+    {
+      "id": "iron-ore",
+      "name": "Iron Ore",
+      "category": "Raw Material",
+      "craftable": false
+    },
+    {
+      "id": "coal",
+      "name": "Coal",
+      "category": "Raw Material",
+      "craftable": false
+    },
+    {
+      "id": "rough-leather",
+      "name": "Rough Leather",
+      "category": "Raw Material",
+      "craftable": false
+    },
+    {
+      "id": "raw-hide",
+      "name": "Raw Hide",
+      "category": "Raw Material",
+      "craftable": false
+    },
+    {
+      "id": "sticky-mucus",
+      "name": "Sticky Mucus",
+      "category": "Raw Material",
+      "craftable": false
+    },
+    {
+      "id": "iron-ingot",
+      "name": "Iron Ingot",
+      "category": "Metal",
+      "craftable": true,
+      "recipe": [
+        { "itemId": "iron-ore", "qty": 5 },
+        { "itemId": "coal", "qty": 2 }
+      ]
+    },
+    {
+      "id": "tanned-leather",
+      "name": "Tanned Leather",
+      "category": "Leather",
+      "craftable": true,
+      "recipe": [
+        { "itemId": "raw-hide", "qty": 3 },
+        { "itemId": "sticky-mucus", "qty": 1 }
+      ]
+    },
+    {
+      "id": "iron-blade",
+      "name": "Iron Blade",
+      "category": "Component",
+      "craftable": true,
+      "recipe": [
+        { "itemId": "iron-ingot", "qty": 3 }
+      ]
+    },
+    {
+      "id": "leather-grip",
+      "name": "Leather Grip",
+      "category": "Component",
+      "craftable": true,
+      "recipe": [
+        { "itemId": "tanned-leather", "qty": 2 },
+        { "itemId": "rough-leather", "qty": 1 }
+      ]
+    },
+    {
+      "id": "iron-sword",
+      "name": "Iron Sword",
+      "category": "Weapon",
+      "craftable": true,
+      "recipe": [
+        { "itemId": "iron-blade", "qty": 1 },
+        { "itemId": "leather-grip", "qty": 1 },
+        { "itemId": "iron-ingot", "qty": 2 }
+      ]
+    },
+    {
+      "id": "iron-shield",
+      "name": "Iron Shield",
+      "category": "Armor",
+      "craftable": true,
+      "recipe": [
+        { "itemId": "iron-ingot", "qty": 5 },
+        { "itemId": "tanned-leather", "qty": 3 }
+      ]
+    },
+    {
+      "id": "adventurer-kit",
+      "name": "Adventurer Kit",
+      "category": "Set",
+      "craftable": true,
+      "recipe": [
+        { "itemId": "iron-sword", "qty": 1 },
+        { "itemId": "iron-shield", "qty": 1 }
+      ]
+    }
+  ]
+}
