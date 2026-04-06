@@ -325,6 +325,119 @@ main {
   margin: 0 18px;
 }
 
+/* Copy bar */
+.copy-bar {
+  padding: 10px 18px 0;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.copy-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  padding: 3px 12px;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.copy-btn:hover {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+/* Covered row (have >= needed) */
+.ingredient-row.is-covered > .ingredient-row-inner {
+  opacity: 0.45;
+}
+
+.qty-badge.is-zero {
+  color: var(--text-muted);
+  border-color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+/* Have counter */
+.have-counter {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 6px;
+  flex-shrink: 0;
+}
+
+.have-label {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  margin-right: 2px;
+  user-select: none;
+}
+
+.have-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.8rem;
+  line-height: 1;
+  padding: 1px 5px;
+  transition: border-color 0.12s, color 0.12s;
+}
+
+.have-btn:hover {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.have-val {
+  background: var(--bg-deep);
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--text-muted);
+  cursor: text;
+  font-size: 0.78rem;
+  min-width: 22px;
+  padding: 1px 4px;
+  text-align: center;
+  transition: border-color 0.12s, color 0.12s;
+  user-select: none;
+}
+
+.have-val:hover {
+  border-color: var(--border);
+  color: var(--text-secondary);
+}
+
+/* Show have value in gold when non-zero */
+.have-counter:has(.have-val:not(:empty)) .have-val {
+  color: inherit;
+}
+
+.have-input {
+  background: var(--bg-deep);
+  border: 1px solid var(--gold);
+  border-radius: 3px;
+  color: var(--gold);
+  font-family: inherit;
+  font-size: 0.78rem;
+  min-width: 44px;
+  outline: none;
+  padding: 1px 4px;
+  text-align: center;
+  width: 44px;
+}
+
+/* Hide spinner arrows on number input */
+.have-input::-webkit-inner-spin-button,
+.have-input::-webkit-outer-spin-button { -webkit-appearance: none; }
+.have-input { -moz-appearance: textfield; }
+
 /* Legend */
 .legend {
   display: flex;
