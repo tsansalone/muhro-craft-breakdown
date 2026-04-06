@@ -4,7 +4,6 @@
     "_fields": {
       "id": "Unique string key. Use kebab-case (e.g. 'iron-ore'). Must match exactly when referenced in recipes.",
       "name": "Display name shown in the UI (e.g. 'Iron Ore').",
-      "category": "Optional grouping label shown in search (e.g. 'Metal', 'Weapon', 'Potion'). Use empty string '' to omit.",
       "craftable": "true = this item can be crafted (has a recipe). false = raw material, no recipe.",
       "recipe": "Array of ingredients needed to craft ONE unit of this item. Only include if craftable=true. Omit or set to [] if craftable=false.",
       "recipe[].itemId": "The 'id' of the ingredient item. Must exist in this file.",
@@ -13,11 +12,16 @@
     "_minimal_example": {
       "id": "my-new-item",
       "name": "My New Item",
-      "category": "Misc",
       "craftable": true,
       "recipe": [
-        { "itemId": "iron-ore", "qty": 3 },
-        { "itemId": "coal", "qty": 1 }
+        {
+          "itemId": "iron-ore",
+          "qty": 3
+        },
+        {
+          "itemId": "coal",
+          "qty": 1
+        }
       ]
     },
     "_tips": [
@@ -28,107 +32,219 @@
       "Avoid circular references (A needs B needs A). The app does not guard against infinite loops."
     ]
   },
-
   "items": [
     {
-      "id": "iron-ore",
-      "name": "Iron Ore",
-      "category": "Raw Material",
+      "id": "470336",
+      "name": "Dimension World Hunting Boots",
+      "craftable": true,
+      "recipe": [
+        {
+          "itemId": "1001996",
+          "qty": 250
+        },
+        {
+          "itemId": "1002007",
+          "qty": 20
+        },
+        {
+          "itemId": "1002008",
+          "qty": 15
+        },
+        {
+          "itemId": "1002012",
+          "qty": 30
+        },
+        {
+          "itemId": "zeny",
+          "qty": 10000000
+        }
+      ]
+    },
+    {
+      "id": "1001996",
+      "name": "Mana Ring",
+      "craftable": true,
+      "recipe": [
+        {
+          "itemId": "1001972",
+          "qty": 1
+        },
+        {
+          "itemId": "zeny",
+          "qty": 50000
+        }
+      ]
+    },
+    {
+      "id": "1002007",
+      "name": "Azure Frontier Stone",
+      "craftable": true,
+      "recipe": [
+        {
+          "itemId": "1001998",
+          "qty": 3
+        },
+        {
+          "itemId": "1002003",
+          "qty": 4
+        },
+        {
+          "itemId": "1002012",
+          "qty": 15
+        },
+        {
+          "itemId": "zeny",
+          "qty": 750000
+        }
+      ]
+    },
+    {
+      "id": "1002012",
+      "name": "Chaotic Rune",
+      "craftable": true,
+      "recipe": [
+        {
+          "itemId": "1002011",
+          "qty": 10
+        },
+        {
+          "itemId": "1001998",
+          "qty": 3
+        },
+        {
+          "itemId": "1001972",
+          "qty": 5
+        }
+      ]
+    },
+    {
+      "id": "1001998",
+      "name": "Frontier Magic Stone",
+      "craftable": true,
+      "recipe": [
+        {
+          "itemId": "1001997",
+          "qty": 5
+        },
+        {
+          "itemId": "1001972",
+          "qty": 3
+        },
+        {
+          "itemId": "zeny",
+          "qty": 50000
+        }
+      ]
+    },
+    {
+      "id": "1001997",
+      "name": "Frontier Magic Powder",
+      "craftable": true,
+      "recipe": [
+        {
+          "itemId": "1000322",
+          "qty": 5
+        },
+        {
+          "itemId": "1001996",
+          "qty": 1
+        },
+        {
+          "itemId": "zeny",
+          "qty": 10000
+        }
+      ]
+    },
+    {
+      "id": "zeny",
+      "name": "Zeny",
       "craftable": false
     },
     {
-      "id": "coal",
-      "name": "Coal",
-      "category": "Raw Material",
+      "id": "1002008",
+      "name": "Sunset Frontier Stone",
+      "craftable": true,
+      "recipe": [
+        {
+          "itemId": "1001998",
+          "qty": 6
+        },
+        {
+          "itemId": "1002004",
+          "qty": 5
+        },
+        {
+          "itemId": "1002012",
+          "qty": 15
+        },
+        {
+          "itemId": "zeny",
+          "qty": 1250000
+        }
+      ]
+    },
+    {
+      "id": "1001972",
+      "name": "Root Gold Coin",
       "craftable": false
     },
     {
-      "id": "rough-leather",
-      "name": "Rough Leather",
-      "category": "Raw Material",
+      "id": "1002003",
+      "name": "Azure Illusion Stone",
+      "craftable": true,
+      "recipe": [
+        {
+          "itemId": "1001999",
+          "qty": 7
+        },
+        {
+          "itemId": "1001997",
+          "qty": 100
+        },
+        {
+          "itemId": "zeny",
+          "qty": 500000
+        }
+      ]
+    },
+    {
+      "id": "1002011",
+      "name": "Chaotic Rune Fragment",
       "craftable": false
     },
     {
-      "id": "raw-hide",
-      "name": "Raw Hide",
-      "category": "Raw Material",
+      "id": "1000322",
+      "name": "Etel Dust",
       "craftable": false
     },
     {
-      "id": "sticky-mucus",
-      "name": "Sticky Mucus",
-      "category": "Raw Material",
+      "id": "1002000",
+      "name": "Sunset Illusion Fragment",
       "craftable": false
     },
     {
-      "id": "iron-ingot",
-      "name": "Iron Ingot",
-      "category": "Metal",
+      "id": "1002004",
+      "name": "Sunset Illusion Stone",
       "craftable": true,
       "recipe": [
-        { "itemId": "iron-ore", "qty": 5 },
-        { "itemId": "coal", "qty": 2 }
+        {
+          "itemId": "1002000",
+          "qty": 7
+        },
+        {
+          "itemId": "1001997",
+          "qty": 125
+        },
+        {
+          "itemId": "zeny",
+          "qty": 750000
+        }
       ]
     },
     {
-      "id": "tanned-leather",
-      "name": "Tanned Leather",
-      "category": "Leather",
-      "craftable": true,
-      "recipe": [
-        { "itemId": "raw-hide", "qty": 3 },
-        { "itemId": "sticky-mucus", "qty": 1 }
-      ]
-    },
-    {
-      "id": "iron-blade",
-      "name": "Iron Blade",
-      "category": "Component",
-      "craftable": true,
-      "recipe": [
-        { "itemId": "iron-ingot", "qty": 3 }
-      ]
-    },
-    {
-      "id": "leather-grip",
-      "name": "Leather Grip",
-      "category": "Component",
-      "craftable": true,
-      "recipe": [
-        { "itemId": "tanned-leather", "qty": 2 },
-        { "itemId": "rough-leather", "qty": 1 }
-      ]
-    },
-    {
-      "id": "iron-sword",
-      "name": "Iron Sword",
-      "category": "Weapon",
-      "craftable": true,
-      "recipe": [
-        { "itemId": "iron-blade", "qty": 1 },
-        { "itemId": "leather-grip", "qty": 1 },
-        { "itemId": "iron-ingot", "qty": 2 }
-      ]
-    },
-    {
-      "id": "iron-shield",
-      "name": "Iron Shield",
-      "category": "Armor",
-      "craftable": true,
-      "recipe": [
-        { "itemId": "iron-ingot", "qty": 5 },
-        { "itemId": "tanned-leather", "qty": 3 }
-      ]
-    },
-    {
-      "id": "adventurer-kit",
-      "name": "Adventurer Kit",
-      "category": "Set",
-      "craftable": true,
-      "recipe": [
-        { "itemId": "iron-sword", "qty": 1 },
-        { "itemId": "iron-shield", "qty": 1 }
-      ]
+      "id": "1001999",
+      "name": "Azure Illusion Fragment",
+      "craftable": false
     }
   ]
 }

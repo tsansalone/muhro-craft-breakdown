@@ -84,8 +84,7 @@ function renderSearchResults(query, listEl) {
   }
 
   const matches = [...itemsMap.values()].filter(item =>
-    item.name.toLowerCase().includes(query) ||
-    (item.category && item.category.toLowerCase().includes(query))
+    item.name.toLowerCase().includes(query)
   );
 
   if (matches.length === 0) {
@@ -93,10 +92,7 @@ function renderSearchResults(query, listEl) {
   } else {
     for (const item of matches) {
       const li = document.createElement('li');
-      li.innerHTML = `
-        <span class="item-name">${escapeHtml(item.name)}</span>
-        ${item.category ? `<span class="item-category">${escapeHtml(item.category)}</span>` : ''}
-      `;
+      li.innerHTML = `<span class="item-name">${escapeHtml(item.name)}</span>`;
       li.addEventListener('click', () => {
         selectItem(item, listEl);
       });
@@ -131,9 +127,9 @@ function renderRecipePanel(item) {
   // Header
   const header = document.createElement('div');
   header.className = 'recipe-header';
+  const titleUrl = muhroUrl(item.id);
   header.innerHTML = `
-    <span class="item-title">${escapeHtml(item.name)}</span>
-    ${item.category ? `<span class="item-cat-badge">${escapeHtml(item.category)}</span>` : ''}
+    <span class="item-title">${titleUrl ? `<a href="${titleUrl}" target="_blank" rel="noopener" class="item-link">${escapeHtml(item.name)}</a>` : escapeHtml(item.name)}</span>
     <span class="recipe-subtitle">${(item.craftable && item.recipe && item.recipe.length > 0) ? 'Craftable' : item.craftable ? 'Craftable (no recipe on file)' : 'Raw material'}</span>
   `;
   panel.appendChild(header);
@@ -183,6 +179,62 @@ function renderRecipePanel(item) {
       </div>` : ''}
     </div>
   `);
+
+  // Shopping List aggregate
+  renderAggregateSection(item, panel);
+}
+
+/**
+ * Renders a flat Shopping List section showing all leaf materials summed
+ * across the full recipe tree, respecting skipState and haveState.
+ */
+/**
+ * Sorts aggregate entries: numerics ascending, then alphabetical, Zeny always last.
+ */
+function sortedAggregateEntries(aggregate) {
+  return [...aggregate.entries()].sort(([idA], [idB]) => {
+    if (idA === 'zeny') return 1;
+    if (idB === 'zeny') return -1;
+    const nA = Number(idA), nB = Number(idB);
+    if (!isNaN(nA) && !isNaN(nB)) return nA - nB;
+    if (!isNaN(nA)) return -1;
+    if (!isNaN(nB)) return 1;
+    return idA.localeCompare(idB);
+  });
+}
+
+function renderAggregateSection(item, panel) {
+  const aggregate = buildAggregate(item.recipe, 1, 1, item.id);
+  if (aggregate.size === 0) return;
+
+  const twoCol = [...aggregate.values()].some(e => e.fullTotal !== e.neededTotal);
+  const sorted = sortedAggregateEntries(aggregate);
+
+  const section = document.createElement('div');
+  section.className = 'aggregate-section';
+
+  let html = `<div class="aggregate-header">Farming List</div><div class="aggregate-list">`;
+
+  for (const [id, entry] of sorted) {
+    const deducted = entry.fullTotal !== entry.neededTotal;
+    const qtyHtml = twoCol
+      ? `<div class="qty-group">
+           <span class="qty-badge qty-full${deducted ? ' has-deduction' : ''}">${formatQty(entry.fullTotal)}</span>
+           <span class="qty-badge qty-needed${entry.neededTotal === 0 ? ' is-zero' : ''}">${formatQty(entry.neededTotal)}</span>
+         </div>`
+      : `<span class="qty-badge">${formatQty(entry.fullTotal)}</span>`;
+
+    const aggUrl  = muhroUrl(id);
+    const aggName = aggUrl
+      ? `<a href="${aggUrl}" target="_blank" rel="noopener" class="item-link">${escapeHtml(entry.name)}</a>`
+      : escapeHtml(entry.name);
+
+    html += `<div class="aggregate-row">${qtyHtml}<span class="aggregate-name">${aggName}</span></div>`;
+  }
+
+  html += `</div>`;
+  section.innerHTML = html;
+  panel.appendChild(section);
 }
 
 /**
@@ -228,7 +280,9 @@ function renderIngredientTree(ingredients, fullMultiplier, effectiveMultiplier, 
 
     const isCraftable  = isBreakdownable(item);
     const nameClass    = !item ? 'is-unknown' : isCraftable ? 'is-craftable' : 'is-raw';
-    const displayName  = item ? escapeHtml(item.name) : escapeHtml(ingredient.itemId);
+    const rawName      = item ? escapeHtml(item.name) : escapeHtml(ingredient.itemId);
+    const ingUrl       = muhroUrl(ingredient.itemId);
+    const displayName  = ingUrl ? `<a href="${ingUrl}" target="_blank" rel="noopener" class="item-link">${rawName}</a>` : rawName;
     const unknownBadge = !item ? '<span class="unknown-badge">?</span>' : '';
     const connector    = depth === 0 ? '◆' : '└─';
 
@@ -262,6 +316,7 @@ function renderIngredientTree(ingredients, fullMultiplier, effectiveMultiplier, 
           <button class="have-btn" data-action="minus" title="Remove one">−</button>
           <span class="have-val" title="Click to type">${have}</span>
           <button class="have-btn" data-action="plus" title="Add one">+</button>
+          <button class="have-btn have-all-btn" data-action="all" title="Mark all as owned">✓</button>
         </div>
       </div>
     `;
@@ -297,6 +352,11 @@ function renderIngredientTree(ingredients, fullMultiplier, effectiveMultiplier, 
     rowEl.querySelector('[data-action="plus"]').addEventListener('click', () => {
       const cur = haveState.get(rowKey) || 0;
       haveState.set(rowKey, cur + 1);
+      renderRecipePanel(selectedItem);
+    });
+
+    rowEl.querySelector('[data-action="all"]').addEventListener('click', () => {
+      haveState.set(rowKey, Math.ceil(baseEffQty));
       renderRecipePanel(selectedItem);
     });
 
@@ -423,23 +483,96 @@ function buildNeededTree(ingredients, multiplier, depth, parentKey) {
 }
 
 /**
+ * Builds a flat aggregate of all leaf materials needed.
+ * Always recurses into craftable items (ignores breakdownState),
+ * but respects skipState (skipped items are treated as leaves).
+ * Returns Map<itemId, { name, category, fullTotal, neededTotal }>
+ */
+function buildAggregate(ingredients, fullMultiplier, effectiveMultiplier, parentKey) {
+  const totals = new Map();
+
+  function recurse(ingr, fullMult, effMult, pKey) {
+    ingr.forEach((ingredient, index) => {
+      const rowKey       = `${pKey}|${ingredient.itemId}|${index}`;
+      const item         = itemsMap.get(ingredient.itemId);
+      const fullQty      = ingredient.qty * fullMult;
+      const baseEffQty   = ingredient.qty * effMult;
+      const have         = haveState.get(rowKey) || 0;
+      const effectiveQty = Math.max(0, baseEffQty - have);
+
+      if (isBreakdownable(item) && !skipState.has(rowKey)) {
+        recurse(item.recipe, fullQty, effectiveQty, rowKey);
+      } else {
+        const name     = item ? item.name : ingredient.itemId + ' (?)';
+        const category = item ? (item.category || '') : '';
+        if (totals.has(ingredient.itemId)) {
+          const entry = totals.get(ingredient.itemId);
+          entry.fullTotal   += fullQty;
+          entry.neededTotal += effectiveQty;
+        } else {
+          totals.set(ingredient.itemId, { name, category, fullTotal: fullQty, neededTotal: effectiveQty });
+        }
+      }
+    });
+  }
+
+  recurse(ingredients, fullMultiplier, effectiveMultiplier, parentKey);
+  return totals;
+}
+
+/**
  * Entry point for copy. Returns one section when nothing is marked,
  * two sections (Recipe + Needed) when any have-deductions are active.
+ * Always appends a Shopping List section.
  */
 function buildCopyText(item) {
   const hasDeductions = hasAnyDeductions(item.recipe, 1, item.id);
+  const aggregateText = buildAggregateText(item);
 
   if (!hasDeductions) {
-    return `${item.name}\n${buildFullTree(item.recipe, 1, 0, item.id)}`;
+    const recipePart = `${item.name}\n${buildFullTree(item.recipe, 1, 0, item.id)}`;
+    return aggregateText ? `${recipePart}\n\n${aggregateText}` : recipePart;
   }
 
   const recipePart = `${item.name} - Recipe\n${buildFullTree(item.recipe, 1, 0, item.id)}`;
   const neededPart = `${item.name} - Needed\n${buildNeededTree(item.recipe, 1, 0, item.id)}`;
-  return `${recipePart}\n\n${neededPart}`;
+  return aggregateText
+    ? `${recipePart}\n\n${neededPart}\n\n${aggregateText}`
+    : `${recipePart}\n\n${neededPart}`;
+}
+
+/**
+ * Builds the plain-text Shopping List section from the aggregate.
+ */
+function buildAggregateText(item) {
+  const aggregate = buildAggregate(item.recipe, 1, 1, item.id);
+  if (aggregate.size === 0) return '';
+
+  const anyDeductions = [...aggregate.values()].some(e => e.fullTotal !== e.neededTotal);
+  const sorted = sortedAggregateEntries(aggregate);
+  const lines = [];
+
+  for (const [, entry] of sorted) {
+    if (anyDeductions) {
+      const neededPart = entry.neededTotal === 0
+        ? '(covered)'
+        : formatQtyText(entry.neededTotal);
+      lines.push(`${formatQtyText(entry.fullTotal)} ${entry.name} -> need: ${neededPart}`);
+    } else {
+      lines.push(`${formatQtyText(entry.fullTotal)} ${entry.name}`);
+    }
+  }
+
+  return `${item.name} - Farming List\n${lines.join('\n')}`;
 }
 
 function formatQtyText(n) {
-  return Number.isInteger(n) ? `${n}x` : `${n.toFixed(2)}x`;
+  return formatNum(n) + '×';
+}
+
+function formatNum(n) {
+  const str = Number.isInteger(n) ? String(n) : n.toFixed(2);
+  return str.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -452,7 +585,13 @@ function isBreakdownable(item) {
   return !!(item && item.craftable && item.recipe && item.recipe.length > 0);
 }
 function formatQty(n) {
-  return Number.isInteger(n) ? `${n}×` : `${n.toFixed(2)}×`;
+  return formatNum(n);
+}
+
+function muhroUrl(itemId) {
+  return /^\d+$/.test(itemId)
+    ? `https://flux.muhro.eu/?module=item&action=view&id=${itemId}`
+    : null;
 }
 
 function escapeHtml(str) {
