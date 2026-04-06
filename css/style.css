@@ -254,6 +254,35 @@ main {
   flex-shrink: 0;
 }
 
+/* Two-column qty group — all siblings align when any has a deduction */
+.qty-group {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+  align-items: flex-end;
+}
+
+/* Left column: recipe total — muted, strikethrough when deducted */
+.qty-badge.qty-full {
+  color: var(--text-muted);
+  border-color: var(--border);
+}
+
+.qty-badge.qty-full.has-deduction {
+  text-decoration: line-through;
+  text-decoration-color: var(--text-muted);
+}
+
+/* Right column: still needed — gold when > 0, green-dim when fully covered */
+.qty-badge.qty-needed {
+  border-color: var(--gold);
+}
+
+.qty-badge.qty-needed.is-zero {
+  color: var(--craftable-dim);
+  border-color: var(--craftable-dim);
+}
+
 .ingredient-name {
   flex: 1;
   font-size: 0.95rem;
@@ -311,6 +340,30 @@ main {
   background: var(--collapse-hover);
 }
 
+/* Craft checkbox */
+.craft-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.craft-toggle:hover {
+  color: var(--text-secondary);
+}
+
+.craft-check {
+  accent-color: var(--gold);
+  cursor: pointer;
+  width: 12px;
+  height: 12px;
+}
+
 /* Sub-tree container */
 .sub-tree {
   width: 100%;
@@ -350,15 +403,11 @@ main {
   color: var(--gold);
 }
 
-/* Covered row (have >= needed) */
-.ingredient-row.is-covered > .ingredient-row-inner {
-  opacity: 0.45;
-}
-
-.qty-badge.is-zero {
-  color: var(--text-muted);
-  border-color: var(--text-muted);
-  text-decoration: line-through;
+/* Covered row (effectiveQty = 0) — dim the name and controls, leave badges readable */
+.ingredient-row.is-covered > .ingredient-row-inner .ingredient-name,
+.ingredient-row.is-covered > .ingredient-row-inner .breakdown-btn,
+.ingredient-row.is-covered > .ingredient-row-inner .have-counter {
+  opacity: 0.4;
 }
 
 /* Have counter */
@@ -464,6 +513,9 @@ main {
 
 .legend-dot.craftable { background: var(--craftable); }
 .legend-dot.raw       { background: var(--raw); }
+.legend-dot.two-col   {
+  background: linear-gradient(90deg, var(--text-muted) 50%, var(--gold) 50%);
+}
 
 /* ---- Scrollbar ---- */
 ::-webkit-scrollbar { width: 6px; }

@@ -28,6 +28,7 @@ let itemsMap = new Map();          // id → item object
 let selectedItem = null;           // currently displayed item
 const breakdownState = new Map();  // rowKey → boolean (expanded?)
 const haveState = new Map();       // rowKey → number  (qty player already has)
+const skipState = new Set();       // rowKey → marked as "obtain directly, don't break down"
 
 // ── Bootstrap ──────────────────────────────────────────────────────────────
 async function init() {
@@ -110,6 +111,7 @@ function selectItem(item, listEl) {
   selectedItem = item;
   breakdownState.clear();
   haveState.clear();
+  skipState.clear();
   closeResults(listEl);
   document.getElementById('search-input').value = item.name;
   renderRecipePanel(item);
@@ -162,10 +164,11 @@ function renderRecipePanel(item) {
   // Tree
   const treeEl = document.createElement('div');
   treeEl.className = 'ingredient-tree';
-  renderIngredientTree(item.recipe, 1, 0, item.id, treeEl);
+  renderIngredientTree(item.recipe, 1, 1, 0, item.id, treeEl);
   panel.appendChild(treeEl);
 
   // Legend
+  const hasDeductions = hasAnyDeductions(item.recipe, 1, item.id);
   panel.insertAdjacentHTML('beforeend', `
     <div class="legend">
       <div class="legend-item">
@@ -174,6 +177,10 @@ function renderRecipePanel(item) {
       <div class="legend-item">
         <span class="legend-dot raw"></span> Raw material
       </div>
+      ${hasDeductions ? `
+      <div class="legend-item">
+        <span class="legend-dot two-col"></span> Two columns: left = recipe total &nbsp;|&nbsp; right = still needed
+      </div>` : ''}
     </div>
   `);
 }
@@ -181,21 +188,33 @@ function renderRecipePanel(item) {
 /**
  * Renders a list of recipe ingredients into `containerEl`.
  *
- * @param {Array}       ingredients  Array of { itemId, qty }
- * @param {number}      multiplier   Accumulated quantity factor from parent levels
- * @param {number}      depth        Tree depth (0 = top-level)
- * @param {string}      parentKey    Unique key of the parent context (for row identity)
- * @param {HTMLElement} containerEl  Element to append rows into
+ * Two multipliers flow independently through the tree:
+ *   fullMultiplier      — recipe total, unaffected by haveState
+ *   effectiveMultiplier — after parent deductions; drives the "needed" column
+ *
+ * Per row:
+ *   fullQty      = ingredient.qty * fullMultiplier      (what the recipe requires)
+ *   baseEffQty   = ingredient.qty * effectiveMultiplier (what parent deductions leave)
+ *   effectiveQty = max(0, baseEffQty - have)            (after this row's own deduction)
+ *
+ * Children receive (fullQty, effectiveQty) so both streams propagate correctly.
  */
-function renderIngredientTree(ingredients, multiplier, depth, parentKey, containerEl) {
+function renderIngredientTree(ingredients, fullMultiplier, effectiveMultiplier, depth, parentKey, containerEl) {
+  // Two-column layout when any sibling has a have-value OR a parent deduction propagated down
+  const twoCol = fullMultiplier !== effectiveMultiplier || ingredients.some((ingredient, index) => {
+    const rowKey = `${parentKey}|${ingredient.itemId}|${index}`;
+    return (haveState.get(rowKey) || 0) > 0;
+  });
+
   ingredients.forEach((ingredient, index) => {
-    const rowKey      = `${parentKey}|${ingredient.itemId}|${index}`;
-    const item        = itemsMap.get(ingredient.itemId);
-    const fullQty     = ingredient.qty * multiplier;
-    const have        = haveState.get(rowKey) || 0;
-    const effectiveQty = Math.max(0, fullQty - have);
-    const expanded    = breakdownState.get(rowKey) === true;
-    const covered     = have > 0 && effectiveQty === 0;
+    const rowKey       = `${parentKey}|${ingredient.itemId}|${index}`;
+    const item         = itemsMap.get(ingredient.itemId);
+    const fullQty      = ingredient.qty * fullMultiplier;
+    const baseEffQty   = ingredient.qty * effectiveMultiplier;
+    const have         = haveState.get(rowKey) || 0;
+    const effectiveQty = Math.max(0, baseEffQty - have);
+    const expanded     = breakdownState.get(rowKey) === true;
+    const covered      = effectiveQty === 0 && (have > 0 || effectiveMultiplier === 0);
 
     if (depth === 0 && index > 0) {
       const divider = document.createElement('hr');
@@ -207,21 +226,36 @@ function renderIngredientTree(ingredients, multiplier, depth, parentKey, contain
     rowEl.className = 'ingredient-row' + (covered ? ' is-covered' : '');
     rowEl.dataset.depth = depth;
 
-    const isCraftable  = item && item.craftable && item.recipe && item.recipe.length > 0;
+    const isCraftable  = isBreakdownable(item);
     const nameClass    = !item ? 'is-unknown' : isCraftable ? 'is-craftable' : 'is-raw';
     const displayName  = item ? escapeHtml(item.name) : escapeHtml(ingredient.itemId);
     const unknownBadge = !item ? '<span class="unknown-badge">?</span>' : '';
     const connector    = depth === 0 ? '◆' : '└─';
 
+    const skipped  = skipState.has(rowKey);
+    const deducted = fullQty !== effectiveQty;
+    const qtyHtml  = twoCol
+      ? `<div class="qty-group">
+           <span class="qty-badge qty-full${deducted ? ' has-deduction' : ''}">${formatQty(fullQty)}</span>
+           <span class="qty-badge qty-needed${effectiveQty === 0 ? ' is-zero' : ''}">${formatQty(effectiveQty)}</span>
+         </div>`
+      : `<span class="qty-badge">${formatQty(fullQty)}</span>`;
+
     rowEl.innerHTML = `
       <div class="ingredient-row-inner">
         <span class="tree-connector">${connector}</span>
-        <span class="qty-badge${effectiveQty === 0 && have > 0 ? ' is-zero' : ''}">${formatQty(effectiveQty)}</span>
+        ${qtyHtml}
         <span class="ingredient-name ${nameClass}">${displayName}${unknownBadge}</span>
-        ${isCraftable
+        ${isCraftable && !skipped
           ? `<button class="breakdown-btn ${expanded ? 'expanded' : ''}" data-row-key="${escapeAttr(rowKey)}">
                ${expanded ? '▲ collapse' : '▼ breakdown'}
              </button>`
+          : ''}
+        ${isCraftable
+          ? `<label class="craft-toggle" title="Uncheck if obtaining via drop or buy">
+               <input type="checkbox" class="craft-check" ${skipped ? '' : 'checked'}>
+               craft
+             </label>`
           : ''}
         <div class="have-counter" data-row-key="${escapeAttr(rowKey)}">
           <span class="have-label">have:</span>
@@ -233,9 +267,22 @@ function renderIngredientTree(ingredients, multiplier, depth, parentKey, contain
     `;
 
     // Breakdown toggle
-    if (isCraftable) {
+    if (isCraftable && !skipped) {
       rowEl.querySelector('.breakdown-btn').addEventListener('click', () => {
         breakdownState.set(rowKey, !breakdownState.get(rowKey));
+        renderRecipePanel(selectedItem);
+      });
+    }
+
+    // Craft checkbox
+    if (isCraftable) {
+      rowEl.querySelector('.craft-check').addEventListener('change', (e) => {
+        if (e.target.checked) {
+          skipState.delete(rowKey);
+        } else {
+          skipState.add(rowKey);
+          breakdownState.delete(rowKey); // collapse if was expanded
+        }
         renderRecipePanel(selectedItem);
       });
     }
@@ -255,7 +302,6 @@ function renderIngredientTree(ingredients, multiplier, depth, parentKey, contain
 
     // Have counter — click to type
     rowEl.querySelector('.have-val').addEventListener('click', function () {
-      const counter = this.closest('.have-counter');
       const cur = haveState.get(rowKey) || 0;
 
       const input = document.createElement('input');
@@ -280,11 +326,11 @@ function renderIngredientTree(ingredients, multiplier, depth, parentKey, contain
       input.addEventListener('blur', commit);
     });
 
-    // Sub-tree — uses effectiveQty so deductions propagate
-    if (isCraftable && expanded) {
+    // Sub-tree — skipped rows are treated as leaves regardless of expansion state
+    if (isCraftable && expanded && !skipped) {
       const subTree = document.createElement('div');
       subTree.className = 'sub-tree';
-      renderIngredientTree(item.recipe, effectiveQty, depth + 1, rowKey, subTree);
+      renderIngredientTree(item.recipe, fullQty, effectiveQty, depth + 1, rowKey, subTree);
       rowEl.appendChild(subTree);
     }
 
@@ -302,7 +348,7 @@ function hasAnyDeductions(ingredients, multiplier, parentKey) {
     const rowKey = `${parentKey}|${ingredient.itemId}|${index}`;
     if ((haveState.get(rowKey) || 0) > 0) return true;
     const item = itemsMap.get(ingredient.itemId);
-    if (item && item.craftable && item.recipe) {
+    if (isBreakdownable(item) && breakdownState.get(rowKey) === true && !skipState.has(rowKey)) {
       const qty = ingredient.qty * multiplier;
       return hasAnyDeductions(item.recipe, qty, rowKey);
     }
@@ -327,13 +373,14 @@ function buildFullTree(ingredients, multiplier, depth, parentKey) {
     const expanded = breakdownState.get(rowKey) === true;
 
     const name        = item ? item.name : ingredient.itemId + ' (?)';
-    const isCraftable = item && item.craftable && item.recipe && item.recipe.length > 0;
-    const craftedNote = isCraftable ? ' [crafted]' : '';
+    const isCraftable = isBreakdownable(item);
+    const recurse     = isCraftable && expanded && !skipState.has(rowKey);
+    const craftedNote = recurse ? ' [crafted]' : '';
     const haveNote    = have > 0 ? ` (have ${have})` : '';
 
     lines.push(`${indent}${formatQtyText(fullQty)} ${name}${craftedNote}${haveNote}`);
 
-    if (isCraftable) {
+    if (recurse) {
       lines.push(buildFullTree(item.recipe, fullQty, depth + 1, rowKey));
     }
   });
@@ -361,12 +408,13 @@ function buildNeededTree(ingredients, multiplier, depth, parentKey) {
     if (effectiveQty === 0) return; // fully covered, skip
 
     const name        = item ? item.name : ingredient.itemId + ' (?)';
-    const isCraftable = item && item.craftable && item.recipe && item.recipe.length > 0;
-    const craftedNote = isCraftable ? ' [crafted]' : '';
+    const isCraftable = isBreakdownable(item);
+    const recurse     = isCraftable && expanded && !skipState.has(rowKey);
+    const craftedNote = recurse ? ' [crafted]' : '';
 
     lines.push(`${indent}${formatQtyText(effectiveQty)} ${name}${craftedNote}`);
 
-    if (isCraftable) {
+    if (recurse) {
       lines.push(buildNeededTree(item.recipe, effectiveQty, depth + 1, rowKey));
     }
   });
@@ -395,6 +443,14 @@ function formatQtyText(n) {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
+
+/**
+ * Returns true if the item should show a breakdown toggle and be recursed into.
+ * Respects breakdown=false for items that are craftable but normally obtained as drops.
+ */
+function isBreakdownable(item) {
+  return !!(item && item.craftable && item.recipe && item.recipe.length > 0);
+}
 function formatQty(n) {
   return Number.isInteger(n) ? `${n}×` : `${n.toFixed(2)}×`;
 }
