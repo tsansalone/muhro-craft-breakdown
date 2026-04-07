@@ -12,17 +12,38 @@
       "recipes": "Use instead of 'recipe' when the item has multiple crafting paths. Array of { name, recipe } objects. 'name' is shown on the switcher tab (e.g. 'Blacksmith', 'Alchemist'). 'recipe' follows the same format as the top-level recipe field."
     },
     "_minimal_example": {
-      "id": "my-new-item",
-      "name": "My New Item",
+      "id": "1001996",
+      "name": "Mana Ring",
       "craftable": true,
       "recipe": [
+        { "itemId": "1001972", "qty": 1 },
+        { "itemId": "zeny", "qty": 50000 }
+      ]
+    },
+    "_multi_recipe_example": {
+      "id": "984",
+      "name": "Oridecon",
+      "craftable": true,
+      "droppable": true,
+      "recipes": [
         {
-          "itemId": "iron-ore",
-          "qty": 3
+          "name": "Rough Oridecon",
+          "recipe": [
+            { "itemId": "756", "qty": 5 }
+          ]
         },
         {
-          "itemId": "coal",
-          "qty": 1
+          "name": "Bradium",
+          "recipe": [
+            { "itemId": "6224", "qty": 1 },
+            { "itemId": "zeny", "qty": 4000 }
+          ]
+        },
+        {
+          "name": "Paramarket",
+          "recipe": [
+            { "itemId": "zeny", "qty": 80000 }
+          ]
         }
       ]
     },
