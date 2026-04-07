@@ -190,8 +190,18 @@
     {
       "id": "1001972",
       "name": "Root Gold Coin",
-      "craftable": false,
-      "droppable": true
+      "craftable": true,
+      "droppable": true,
+      "recipe": [
+        {
+          "itemId": "1001996",
+          "qty": 1
+        },
+        {
+          "itemId": "zeny",
+          "qty": 30000
+        }
+      ]
     },
     {
       "id": "1002003",

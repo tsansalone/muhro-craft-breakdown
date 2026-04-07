@@ -161,7 +161,7 @@ function renderRecipePanel(item) {
   // Tree
   const treeEl = document.createElement('div');
   treeEl.className = 'ingredient-tree';
-  renderIngredientTree(item.recipe, 1, 1, 0, item.id, treeEl);
+  renderIngredientTree(item.recipe, 1, 1, 0, item.id, treeEl, new Set([item.id]));
   panel.appendChild(treeEl);
 
   // Legend
@@ -252,7 +252,7 @@ function renderAggregateSection(item, panel) {
  *
  * Children receive (fullQty, effectiveQty) so both streams propagate correctly.
  */
-function renderIngredientTree(ingredients, fullMultiplier, effectiveMultiplier, depth, parentKey, containerEl) {
+function renderIngredientTree(ingredients, fullMultiplier, effectiveMultiplier, depth, parentKey, containerEl, ancestors = new Set()) {
   // Two-column layout when any sibling has a have-value OR a parent deduction propagated down
   const twoCol = fullMultiplier !== effectiveMultiplier || ingredients.some((ingredient, index) => {
     const rowKey = `${parentKey}|${ingredient.itemId}|${index}`;
@@ -287,9 +287,12 @@ function renderIngredientTree(ingredients, fullMultiplier, effectiveMultiplier, 
     const unknownBadge = !item ? '<span class="unknown-badge">?</span>' : '';
     const connector    = depth === 0 ? '◆' : '└─';
 
-    const skipped  = !willCraft(rowKey, item);
-    const deducted = fullQty !== effectiveQty;
-    const qtyHtml  = twoCol
+    const skipped          = !willCraft(rowKey, item);
+    const wouldLoop        = isCraftable && ancestors.has(ingredient.itemId);
+    const leadsToLoop      = isCraftable && !wouldLoop && !!(item?.recipe?.some(ing => ancestors.has(ing.itemId)));
+    const blocked          = wouldLoop || leadsToLoop;
+    const deducted  = fullQty !== effectiveQty;
+    const qtyHtml   = twoCol
       ? `<div class="qty-group">
            <span class="qty-badge qty-full${deducted ? ' has-deduction' : ''}">${formatQty(fullQty)}</span>
            <span class="qty-badge qty-needed${effectiveQty === 0 ? ' is-zero' : ''}">${formatQty(effectiveQty)}</span>
@@ -301,12 +304,12 @@ function renderIngredientTree(ingredients, fullMultiplier, effectiveMultiplier, 
         <span class="tree-connector">${connector}</span>
         ${qtyHtml}
         <span class="ingredient-name ${nameClass}">${displayName}${unknownBadge}</span>
-        ${isCraftable && !skipped
+        ${!blocked && isCraftable && !skipped
           ? `<button class="breakdown-btn ${expanded ? 'expanded' : ''}" data-row-key="${escapeAttr(rowKey)}">
                ${expanded ? '▲ collapse' : '▼ breakdown'}
              </button>`
           : ''}
-        ${isCraftable
+        ${!blocked && isCraftable
           ? `<label class="craft-toggle" title="Uncheck if obtaining via drop or buy">
                <input type="checkbox" class="craft-check" ${skipped ? '' : 'checked'}>
                craft
@@ -323,7 +326,7 @@ function renderIngredientTree(ingredients, fullMultiplier, effectiveMultiplier, 
     `;
 
     // Breakdown toggle
-    if (isCraftable && !skipped) {
+    if (isCraftable && !skipped && !blocked) {
       rowEl.querySelector('.breakdown-btn').addEventListener('click', () => {
         breakdownState.set(rowKey, !breakdownState.get(rowKey));
         renderRecipePanel(selectedItem);
@@ -331,7 +334,7 @@ function renderIngredientTree(ingredients, fullMultiplier, effectiveMultiplier, 
     }
 
     // Craft checkbox
-    if (isCraftable) {
+    if (isCraftable && !blocked) {
       rowEl.querySelector('.craft-check').addEventListener('change', (e) => {
         craftDecisions.set(rowKey, e.target.checked);
         if (!e.target.checked) breakdownState.delete(rowKey); // collapse if was expanded
@@ -383,11 +386,12 @@ function renderIngredientTree(ingredients, fullMultiplier, effectiveMultiplier, 
       input.addEventListener('blur', commit);
     });
 
-    // Sub-tree — skipped rows are treated as leaves regardless of expansion state
-    if (isCraftable && expanded && !skipped) {
+    // Sub-tree — skipped and loop-blocked rows are treated as leaves
+    if (isCraftable && expanded && !skipped && !blocked) {
       const subTree = document.createElement('div');
       subTree.className = 'sub-tree';
-      renderIngredientTree(item.recipe, fullQty, effectiveQty, depth + 1, rowKey, subTree);
+      const nextAncestors = new Set([...ancestors, ingredient.itemId]);
+      renderIngredientTree(item.recipe, fullQty, effectiveQty, depth + 1, rowKey, subTree, nextAncestors);
       rowEl.appendChild(subTree);
     }
 
@@ -418,7 +422,7 @@ function hasAnyDeductions(ingredients, multiplier, parentKey) {
  * Annotates rows where the player has some with "(have N)".
  * Children always receive the full qty as multiplier (no deductions propagated).
  */
-function buildFullTree(ingredients, multiplier, depth, parentKey) {
+function buildFullTree(ingredients, multiplier, depth, parentKey, ancestors = new Set()) {
   const indent = '  '.repeat(depth);
   const lines = [];
 
@@ -431,14 +435,14 @@ function buildFullTree(ingredients, multiplier, depth, parentKey) {
 
     const name        = item ? item.name : ingredient.itemId + ' (?)';
     const isCraftable = isBreakdownable(item);
-    const recurse     = isCraftable && expanded && willCraft(rowKey, item);
+    const recurse     = isCraftable && expanded && willCraft(rowKey, item) && !ancestors.has(ingredient.itemId);
     const craftedNote = recurse ? ' [crafted]' : '';
     const haveNote    = have > 0 ? ` (have ${have})` : '';
 
     lines.push(`${indent}${formatQtyText(fullQty)} ${name}${craftedNote}${haveNote}`);
 
     if (recurse) {
-      lines.push(buildFullTree(item.recipe, fullQty, depth + 1, rowKey));
+      lines.push(buildFullTree(item.recipe, fullQty, depth + 1, rowKey, new Set([...ancestors, ingredient.itemId])));
     }
   });
 
@@ -450,7 +454,7 @@ function buildFullTree(ingredients, multiplier, depth, parentKey) {
  * Rows with effectiveQty === 0 (fully covered) are skipped entirely.
  * Children receive effectiveQty as multiplier so deductions propagate.
  */
-function buildNeededTree(ingredients, multiplier, depth, parentKey) {
+function buildNeededTree(ingredients, multiplier, depth, parentKey, ancestors = new Set()) {
   const indent = '  '.repeat(depth);
   const lines = [];
 
@@ -466,13 +470,13 @@ function buildNeededTree(ingredients, multiplier, depth, parentKey) {
 
     const name        = item ? item.name : ingredient.itemId + ' (?)';
     const isCraftable = isBreakdownable(item);
-    const recurse     = isCraftable && expanded && willCraft(rowKey, item);
+    const recurse     = isCraftable && expanded && willCraft(rowKey, item) && !ancestors.has(ingredient.itemId);
     const craftedNote = recurse ? ' [crafted]' : '';
 
     lines.push(`${indent}${formatQtyText(effectiveQty)} ${name}${craftedNote}`);
 
     if (recurse) {
-      lines.push(buildNeededTree(item.recipe, effectiveQty, depth + 1, rowKey));
+      lines.push(buildNeededTree(item.recipe, effectiveQty, depth + 1, rowKey, new Set([...ancestors, ingredient.itemId])));
     }
   });
 
@@ -488,7 +492,7 @@ function buildNeededTree(ingredients, multiplier, depth, parentKey) {
 function buildAggregate(ingredients, fullMultiplier, effectiveMultiplier, parentKey) {
   const totals = new Map();
 
-  function recurse(ingr, fullMult, effMult, pKey) {
+  function recurse(ingr, fullMult, effMult, pKey, ancestors) {
     ingr.forEach((ingredient, index) => {
       const rowKey       = `${pKey}|${ingredient.itemId}|${index}`;
       const item         = itemsMap.get(ingredient.itemId);
@@ -497,8 +501,8 @@ function buildAggregate(ingredients, fullMultiplier, effectiveMultiplier, parent
       const have         = haveState.get(rowKey) || 0;
       const effectiveQty = Math.max(0, baseEffQty - have);
 
-      if (isBreakdownable(item) && willCraft(rowKey, item)) {
-        recurse(item.recipe, fullQty, effectiveQty, rowKey);
+      if (isBreakdownable(item) && willCraft(rowKey, item) && !ancestors.has(ingredient.itemId)) {
+        recurse(item.recipe, fullQty, effectiveQty, rowKey, new Set([...ancestors, ingredient.itemId]));
       } else {
         const name     = item ? item.name : ingredient.itemId + ' (?)';
         const category = item ? (item.category || '') : '';
@@ -513,7 +517,7 @@ function buildAggregate(ingredients, fullMultiplier, effectiveMultiplier, parent
     });
   }
 
-  recurse(ingredients, fullMultiplier, effectiveMultiplier, parentKey);
+  recurse(ingredients, fullMultiplier, effectiveMultiplier, parentKey, new Set([parentKey]));
   return totals;
 }
 
