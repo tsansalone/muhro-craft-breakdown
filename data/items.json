@@ -6,9 +6,10 @@
       "name": "Display name shown in the UI (e.g. 'Iron Ore').",
       "craftable": "true = this item can be crafted (has a recipe). false = raw material, no recipe.",
       "droppable": "Optional. true = players typically obtain this by farming/buying rather than crafting. When true, the 'craft' checkbox defaults to unchecked. Omit or false for normal craftable items.",
-      "recipe": "Array of ingredients needed to craft ONE unit of this item. Only include if craftable=true. Omit or set to [] if craftable=false.",
+      "recipe": "Array of ingredients needed to craft ONE unit of this item. Only include if craftable=true and the item has a single recipe. Omit when using 'recipes'.",
       "recipe[].itemId": "The 'id' of the ingredient item. Must exist in this file.",
-      "recipe[].qty": "How many units of this ingredient are needed per craft of the parent item."
+      "recipe[].qty": "How many units of this ingredient are needed per craft of the parent item.",
+      "recipes": "Use instead of 'recipe' when the item has multiple crafting paths. Array of { name, recipe } objects. 'name' is shown on the switcher tab (e.g. 'Blacksmith', 'Alchemist'). 'recipe' follows the same format as the top-level recipe field."
     },
     "_minimal_example": {
       "id": "my-new-item",
@@ -28,6 +29,7 @@
     "_tips": [
       "To add a raw material: set craftable=false and omit recipe.",
       "To add a craftable item: set craftable=true and fill recipe[].",
+      "To add an item with multiple crafting paths: use 'recipes' (array of {name, recipe}) instead of 'recipe'. The UI will show tabs to switch between them.",
       "IDs are case-sensitive. 'Iron-Ore' and 'iron-ore' are different.",
       "You can nest arbitrarily deep — the app handles multi-level breakdown automatically.",
       "Avoid circular references (A needs B needs A). The app does not guard against infinite loops."
@@ -262,6 +264,76 @@
       "id": "1001999",
       "name": "Azure Illusion Fragment",
       "craftable": false
+    },
+    {
+      "id": "756",
+      "name": "Rough Oridecon",
+      "craftable": false,
+      "droppable": true
+    },
+    {
+      "id": "6224",
+      "name": "Bradium",
+      "craftable": false,
+      "droppable": true
+    },
+    {
+      "id": "984",
+      "name": "Oridecon",
+      "craftable": true,
+      "droppable": true,
+      "recipes": [
+        {
+          "name": "Rough Oridecon",
+          "recipe": [
+            {
+              "itemId": "756",
+              "qty": 5
+            }
+          ]
+        },
+        {
+          "name": "Bradium",
+          "recipe": [
+            {
+              "itemId": "6224",
+              "qty": 1
+            },
+            {
+              "itemId": "zeny",
+              "qty": 4000
+            }
+          ]
+        },
+        {
+          "name": "Paramarket",
+          "recipe": [
+            {
+              "itemId": "zeny",
+              "qty": 80000
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1000332",
+      "name": "Etherdeocon",
+      "craftable": true,
+      "recipe": [
+        {
+          "itemId": "984",
+          "qty": 1
+        },
+        {
+          "itemId": "1000322",
+          "qty": 1
+        },
+        {
+          "itemId": "zeny",
+          "qty": 10000
+        }
+      ]
     }
   ]
 }

@@ -30,6 +30,7 @@ const breakdownState  = new Map();  // rowKey → boolean (expanded?)
 const haveState       = new Map();  // rowKey → number  (qty player already has)
 const craftDecisions  = new Map();  // rowKey → explicit user choice: true=craft, false=skip/drop
                                     // when unset, default is: craft unless item.droppable
+const recipeChoiceState = new Map(); // itemId or rowKey → recipe index (for multi-recipe items)
 
 // ── Bootstrap ──────────────────────────────────────────────────────────────
 async function init() {
@@ -109,6 +110,7 @@ function selectItem(item, listEl) {
   breakdownState.clear();
   haveState.clear();
   craftDecisions.clear();
+  recipeChoiceState.clear();
   closeResults(listEl);
   document.getElementById('search-input').value = item.name;
   renderRecipePanel(item);
@@ -129,18 +131,24 @@ function renderRecipePanel(item) {
   const header = document.createElement('div');
   header.className = 'recipe-header';
   const titleUrl = muhroUrl(item.id);
+  const activeRecipe = getEffectiveRecipe(item, item.id);
   header.innerHTML = `
     <span class="item-title">${titleUrl ? `<a href="${titleUrl}" target="_blank" rel="noopener" class="item-link">${escapeHtml(item.name)}</a>` : escapeHtml(item.name)}</span>
-    <span class="recipe-subtitle">${(item.craftable && item.recipe && item.recipe.length > 0) ? 'Craftable' : item.craftable ? 'Craftable (no recipe on file)' : 'Raw material'}</span>
+    <span class="recipe-subtitle">${(item.craftable && activeRecipe.length > 0) ? 'Craftable' : item.craftable ? 'Craftable (no recipe on file)' : 'Raw material'}</span>
   `;
   panel.appendChild(header);
 
-  if (!item.craftable || !item.recipe || item.recipe.length === 0) {
+  if (!item.craftable || activeRecipe.length === 0) {
     const msg = document.createElement('p');
     msg.className = 'no-recipe-msg';
     msg.textContent = item.craftable ? 'No recipe available.' : 'This is a raw material — no recipe.';
     panel.appendChild(msg);
     return;
+  }
+
+  // Recipe switcher (when item has multiple recipes)
+  if (item.recipes && item.recipes.length > 1) {
+    panel.appendChild(buildRecipeSwitcher(item, item.id));
   }
 
   // Copy button
@@ -161,11 +169,11 @@ function renderRecipePanel(item) {
   // Tree
   const treeEl = document.createElement('div');
   treeEl.className = 'ingredient-tree';
-  renderIngredientTree(item.recipe, 1, 1, 0, item.id, treeEl, new Set([item.id]));
+  renderIngredientTree(activeRecipe, 1, 1, 0, item.id, treeEl, new Set([item.id]));
   panel.appendChild(treeEl);
 
   // Legend
-  const hasDeductions = hasAnyDeductions(item.recipe, 1, item.id);
+  const hasDeductions = hasAnyDeductions(activeRecipe, 1, item.id);
   panel.insertAdjacentHTML('beforeend', `
     <div class="legend">
       <div class="legend-item">
@@ -205,7 +213,7 @@ function sortedAggregateEntries(aggregate) {
 }
 
 function renderAggregateSection(item, panel) {
-  const aggregate = buildAggregate(item.recipe, 1, 1, item.id);
+  const aggregate = buildAggregate(getEffectiveRecipe(item, item.id), 1, 1, item.id);
   if (aggregate.size === 0) return;
 
   const twoCol = [...aggregate.values()].some(e => e.fullTotal !== e.neededTotal);
@@ -391,7 +399,10 @@ function renderIngredientTree(ingredients, fullMultiplier, effectiveMultiplier, 
       const subTree = document.createElement('div');
       subTree.className = 'sub-tree';
       const nextAncestors = new Set([...ancestors, ingredient.itemId]);
-      renderIngredientTree(item.recipe, fullQty, effectiveQty, depth + 1, rowKey, subTree, nextAncestors);
+      if (item.recipes && item.recipes.length > 1) {
+        subTree.appendChild(buildRecipeSwitcher(item, rowKey));
+      }
+      renderIngredientTree(getEffectiveRecipe(item, rowKey), fullQty, effectiveQty, depth + 1, rowKey, subTree, nextAncestors);
       rowEl.appendChild(subTree);
     }
 
@@ -411,7 +422,7 @@ function hasAnyDeductions(ingredients, multiplier, parentKey) {
     const item = itemsMap.get(ingredient.itemId);
     if (isBreakdownable(item) && breakdownState.get(rowKey) === true && willCraft(rowKey, item)) {
       const qty = ingredient.qty * multiplier;
-      return hasAnyDeductions(item.recipe, qty, rowKey);
+      return hasAnyDeductions(getEffectiveRecipe(item, rowKey), qty, rowKey);
     }
     return false;
   });
@@ -442,7 +453,7 @@ function buildFullTree(ingredients, multiplier, depth, parentKey, ancestors = ne
     lines.push(`${indent}${formatQtyText(fullQty)} ${name}${craftedNote}${haveNote}`);
 
     if (recurse) {
-      lines.push(buildFullTree(item.recipe, fullQty, depth + 1, rowKey, new Set([...ancestors, ingredient.itemId])));
+      lines.push(buildFullTree(getEffectiveRecipe(item, rowKey), fullQty, depth + 1, rowKey, new Set([...ancestors, ingredient.itemId])));
     }
   });
 
@@ -476,7 +487,7 @@ function buildNeededTree(ingredients, multiplier, depth, parentKey, ancestors = 
     lines.push(`${indent}${formatQtyText(effectiveQty)} ${name}${craftedNote}`);
 
     if (recurse) {
-      lines.push(buildNeededTree(item.recipe, effectiveQty, depth + 1, rowKey, new Set([...ancestors, ingredient.itemId])));
+      lines.push(buildNeededTree(getEffectiveRecipe(item, rowKey), effectiveQty, depth + 1, rowKey, new Set([...ancestors, ingredient.itemId])));
     }
   });
 
@@ -502,7 +513,7 @@ function buildAggregate(ingredients, fullMultiplier, effectiveMultiplier, parent
       const effectiveQty = Math.max(0, baseEffQty - have);
 
       if (isBreakdownable(item) && willCraft(rowKey, item) && !ancestors.has(ingredient.itemId)) {
-        recurse(item.recipe, fullQty, effectiveQty, rowKey, new Set([...ancestors, ingredient.itemId]));
+        recurse(getEffectiveRecipe(item, rowKey), fullQty, effectiveQty, rowKey, new Set([...ancestors, ingredient.itemId]));
       } else {
         const name     = item ? item.name : ingredient.itemId + ' (?)';
         const category = item ? (item.category || '') : '';
@@ -527,16 +538,17 @@ function buildAggregate(ingredients, fullMultiplier, effectiveMultiplier, parent
  * Always appends a Shopping List section.
  */
 function buildCopyText(item) {
-  const hasDeductions = hasAnyDeductions(item.recipe, 1, item.id);
+  const recipe = getEffectiveRecipe(item, item.id);
+  const hasDeductions = hasAnyDeductions(recipe, 1, item.id);
   const aggregateText = buildAggregateText(item);
 
   if (!hasDeductions) {
-    const recipePart = `${item.name}\n${buildFullTree(item.recipe, 1, 0, item.id)}`;
+    const recipePart = `${item.name}\n${buildFullTree(recipe, 1, 0, item.id)}`;
     return aggregateText ? `${recipePart}\n\n${aggregateText}` : recipePart;
   }
 
-  const recipePart = `${item.name} - Recipe\n${buildFullTree(item.recipe, 1, 0, item.id)}`;
-  const neededPart = `${item.name} - Needed\n${buildNeededTree(item.recipe, 1, 0, item.id)}`;
+  const recipePart = `${item.name} - Recipe\n${buildFullTree(recipe, 1, 0, item.id)}`;
+  const neededPart = `${item.name} - Needed\n${buildNeededTree(recipe, 1, 0, item.id)}`;
   return aggregateText
     ? `${recipePart}\n\n${neededPart}\n\n${aggregateText}`
     : `${recipePart}\n\n${neededPart}`;
@@ -546,7 +558,7 @@ function buildCopyText(item) {
  * Builds the plain-text Shopping List section from the aggregate.
  */
 function buildAggregateText(item) {
-  const aggregate = buildAggregate(item.recipe, 1, 1, item.id);
+  const aggregate = buildAggregate(getEffectiveRecipe(item, item.id), 1, 1, item.id);
   if (aggregate.size === 0) return '';
 
   const anyDeductions = [...aggregate.values()].some(e => e.fullTotal !== e.neededTotal);
@@ -580,10 +592,43 @@ function formatNum(n) {
 
 /**
  * Returns true if the item should show a breakdown toggle and be recursed into.
- * Respects breakdown=false for items that are craftable but normally obtained as drops.
  */
 function isBreakdownable(item) {
-  return !!(item && item.craftable && item.recipe && item.recipe.length > 0);
+  if (!item || !item.craftable) return false;
+  if (item.recipes && item.recipes.length > 0) return item.recipes.some(r => r.recipe && r.recipe.length > 0);
+  return !!(item.recipe && item.recipe.length > 0);
+}
+
+/**
+ * Returns the active recipe array for an item, respecting recipeChoiceState.
+ * Falls back to item.recipe for single-recipe items.
+ */
+function getEffectiveRecipe(item, key) {
+  if (item.recipes && item.recipes.length > 0) {
+    const idx = Math.min(recipeChoiceState.get(key) || 0, item.recipes.length - 1);
+    return item.recipes[idx]?.recipe || [];
+  }
+  return item.recipe || [];
+}
+
+/**
+ * Builds a recipe switcher widget for items with multiple recipes.
+ */
+function buildRecipeSwitcher(item, key) {
+  const current = recipeChoiceState.get(key) || 0;
+  const div = document.createElement('div');
+  div.className = 'recipe-switcher';
+  item.recipes.forEach((r, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'recipe-tab' + (i === current ? ' active' : '');
+    btn.textContent = r.name || `Recipe ${i + 1}`;
+    btn.addEventListener('click', () => {
+      recipeChoiceState.set(key, i);
+      renderRecipePanel(selectedItem);
+    });
+    div.appendChild(btn);
+  });
+  return div;
 }
 function formatQty(n) {
   return formatNum(n);

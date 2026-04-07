@@ -214,6 +214,39 @@
     .recipe-qty-input::-webkit-outer-spin-button { -webkit-appearance: none; }
     .recipe-qty-input { -moz-appearance: textfield; }
 
+    /* ── Recipe variants ── */
+    .recipes-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .recipe-variant {
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+      background: rgba(0,0,0,0.12);
+    }
+    .recipe-variant-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .recipe-name-input {
+      flex: 1;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      color: var(--text-primary);
+      font-family: inherit;
+      font-size: 0.82rem;
+      padding: 4px 8px;
+      outline: none;
+    }
+    .recipe-name-input:focus { border-color: var(--gold); }
+
     /* ── Buttons ── */
     .btn {
       border-radius: 3px;
@@ -441,7 +474,13 @@ function renderEditor(item, isNew) {
     return;
   }
 
-  const recipe = item.recipe || [];
+  // Normalize to recipe variants: always work with [{ name, recipe }]
+  let recipeVariants;
+  if (item.recipes && item.recipes.length > 0) {
+    recipeVariants = item.recipes.map(r => ({ name: r.name || '', recipe: r.recipe || [] }));
+  } else {
+    recipeVariants = [{ name: '', recipe: item.recipe || [] }];
+  }
 
   editorEl.innerHTML = `
     <div class="editor-title">${isNew ? 'New Item' : 'Edit: ' + esc(item.name)}</div>
@@ -487,16 +526,11 @@ function renderEditor(item, isNew) {
     </div>
 
     <div id="recipe-section" class="recipe-section" ${item.craftable ? '' : 'style="display:none"'}>
-      <label class="field-label">Recipe Ingredients</label>
-      <table class="recipe-table">
-        <thead><tr>
-          <th style="width:62%">Item</th>
-          <th style="width:20%">Quantity</th>
-          <th style="width:18%"></th>
-        </tr></thead>
-        <tbody id="recipe-tbody"></tbody>
-      </table>
-      <button class="btn btn-ghost btn-sm" id="add-ing-btn">+ Add ingredient</button>
+      <div class="recipes-bar">
+        <label class="field-label" style="margin:0">Recipe Ingredients</label>
+        <button class="btn btn-ghost btn-sm" id="add-variant-btn">+ Add recipe variant</button>
+      </div>
+      <div id="recipe-variants"></div>
     </div>
 
     <div class="editor-actions">
@@ -507,8 +541,8 @@ function renderEditor(item, isNew) {
     </div>
   `;
 
-  // Populate existing recipe rows
-  for (const ing of recipe) addIngRow(ing.itemId, ing.qty);
+  // Populate recipe variants
+  for (const v of recipeVariants) addRecipeVariant(v.name, v.recipe);
 
   // Craftable toggle
   document.getElementById('f-craftable').addEventListener('change', e => {
@@ -523,7 +557,7 @@ function renderEditor(item, isNew) {
       e.target.checked ? 'Obtainable via drop / buy' : 'Not flagged as droppable';
   });
 
-  document.getElementById('add-ing-btn').addEventListener('click', () => addIngRow('', 1));
+  document.getElementById('add-variant-btn').addEventListener('click', () => addRecipeVariant('', []));
   document.getElementById('save-item-btn').addEventListener('click', () => commitItem(isNew));
   document.getElementById('cancel-btn').addEventListener('click', () => {
     editingId = null;
@@ -536,10 +570,49 @@ function renderEditor(item, isNew) {
 }
 
 
-function addIngRow(itemId, qty) {
-  const tbody = document.getElementById('recipe-tbody');
-  if (!tbody) return;
+function addRecipeVariant(name, recipe) {
+  const container = document.getElementById('recipe-variants');
+  if (!container) return;
 
+  const div = document.createElement('div');
+  div.className = 'recipe-variant';
+  div.innerHTML = `
+    <div class="recipe-variant-header">
+      <input class="recipe-name-input" type="text" placeholder="Recipe name (optional, e.g. Blacksmith)" value="${esc(name || '')}">
+      <button class="btn btn-danger btn-sm rm-variant-btn">Remove</button>
+    </div>
+    <table class="recipe-table">
+      <thead><tr>
+        <th style="width:62%">Item</th>
+        <th style="width:20%">Quantity</th>
+        <th style="width:18%"></th>
+      </tr></thead>
+      <tbody class="variant-tbody"></tbody>
+    </table>
+    <button class="btn btn-ghost btn-sm add-ing-btn">+ Add ingredient</button>
+  `;
+
+  const tbody = div.querySelector('.variant-tbody');
+  for (const ing of (recipe || [])) addIngRowTo(tbody, ing.itemId, ing.qty);
+
+  div.querySelector('.add-ing-btn').addEventListener('click', () => addIngRowTo(tbody, '', 1));
+  div.querySelector('.rm-variant-btn').addEventListener('click', () => {
+    div.remove();
+    updateVariantUI();
+  });
+
+  container.appendChild(div);
+  updateVariantUI();
+}
+
+function updateVariantUI() {
+  const container = document.getElementById('recipe-variants');
+  if (!container) return;
+  const headers = container.querySelectorAll('.recipe-variant-header');
+  headers.forEach(h => { h.style.display = headers.length > 1 ? '' : 'none'; });
+}
+
+function addIngRowTo(tbody, itemId, qty) {
   const tr = document.createElement('tr');
   const opts = items.map(i =>
     `<option value="${esc(i.id)}" ${i.id === itemId ? 'selected' : ''}>${esc(i.name)} (${esc(i.id)})</option>`
@@ -554,13 +627,17 @@ function addIngRow(itemId, qty) {
   tbody.appendChild(tr);
 }
 
-function collectRecipe() {
-  return [...document.querySelectorAll('#recipe-tbody tr')].reduce((acc, tr) => {
-    const itemId = tr.querySelector('select').value;
-    const qty    = parseInt(tr.querySelector('input').value, 10);
-    if (itemId && qty > 0) acc.push({ itemId, qty });
-    return acc;
-  }, []);
+function collectRecipes() {
+  return [...document.querySelectorAll('.recipe-variant')].map(v => {
+    const name   = v.querySelector('.recipe-name-input').value.trim();
+    const recipe = [...v.querySelectorAll('.variant-tbody tr')].reduce((acc, tr) => {
+      const itemId = tr.querySelector('select').value;
+      const qty    = parseInt(tr.querySelector('input').value, 10);
+      if (itemId && qty > 0) acc.push({ itemId, qty });
+      return acc;
+    }, []);
+    return { name, recipe };
+  });
 }
 
 function showNotice(msg, type) {
@@ -574,7 +651,7 @@ function commitItem(isNew) {
   const name     = document.getElementById('f-name').value.trim();
   const craftable  = document.getElementById('f-craftable').checked;
   const droppable  = document.getElementById('f-droppable').checked;
-  const recipe     = craftable ? collectRecipe() : [];
+  const variants   = craftable ? collectRecipes() : [];
 
   const errors = [];
   if (!id)   errors.push('ID is required.');
@@ -587,7 +664,16 @@ function commitItem(isNew) {
   const built = { id, name };
   built.craftable = craftable;
   if (droppable) built.droppable = true;
-  if (craftable && recipe.length) built.recipe = recipe;
+  if (craftable && variants.length > 0) {
+    const filled = variants.filter(v => v.recipe.length > 0);
+    if (filled.length === 1 && !filled[0].name) {
+      // Single unnamed recipe → legacy `recipe` field for backwards compat
+      built.recipe = filled[0].recipe;
+    } else if (filled.length > 0) {
+      // Multiple recipes or named recipe → `recipes` field
+      built.recipes = filled.map(v => v.name ? { name: v.name, recipe: v.recipe } : { recipe: v.recipe });
+    }
+  }
 
   if (isNew) {
     items.push(built);
